@@ -1,0 +1,71 @@
+---
+title: "Number of births UK"
+author: "Aleksandra Kubala"
+date: "2024-03-06"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+## Introduction
+
+The goal of the project is to illustrate a variable on a map of the UK. The chosen variable is the number of births. The division of the map will be by county.
+
+## Data information
+
+Statistics relating to the number of births in 2022 are from the website [Office for National Statistics](https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/livebirths/datasets/birthsummarytables).
+
+The data needed to visualize the map comes from the website [OpenDataSoft](https://public.opendatasoft.com/explore/dataset/georef-united-kingdom-county-unitary-authority/export/?disjunctive.ctry_code&disjunctive.ctry_name&disjunctive.rgn_code&disjunctive.rgn_name&disjunctive.ctyua_code&disjunctive.ctyua_name&location=5,55.74711,-3.44316&basemap=jawg.light). 
+
+```{r }
+library(sp)
+library(sf) 
+library(readxl)
+library(knitr)
+
+### MAP
+mapa <- read_sf(".", "georef-united-kingdom-county-unitary-authority-millesime")
+mapa <- st_transform(mapa, "+proj=longlat")
+UK_map <- mapa
+
+# extracting code without unnecessary marks
+UK_map$ctyua_code <- substr(UK_map$ctyua_code, start = 3, stop = nchar(UK_map$ctyua_code))
+UK_map$ctyua_code <- substr(UK_map$ctyua_code, start = 1, stop = nchar(UK_map$ctyua_code) - 2)
+UK_map$ctyua_name <- substr(UK_map$ctyua_name, start = 3, stop = nchar(UK_map$ctyua_name))
+UK_map$ctyua_name <- substr(UK_map$ctyua_name, start = 1, stop = nchar(UK_map$ctyua_name) - 2)
+
+### BIRTHS
+birthssummary2022refreshedpopulations <- read_excel("birthssummary2022refreshedpopulations.xlsx", 
+                                                    sheet = "Table_3", skip = 9)
+births_UK <- birthssummary2022refreshedpopulations
+colnames(births_UK)[1] <- "Code"
+```
+
+## Charasteristics of variable
+
+The variable "number of live births" represents the number of infants born who showed signs of life at birth. The data is for 2022, and the variable ranges from 65 to 16,364.
+
+```{r, warning=FALSE, message=FALSE}
+spatial_data <- merge(y = births_UK, x = UK_map, by.y = "Code", by.x = "ctyua_code")
+summary(spatial_data$`Number of live births`)
+```
+
+```{r }
+# Table for regions with highest and lowest births
+highest_births <- spatial_data[order(-spatial_data$`Number of live births`), ][1:3, ]
+highest_births <- as.data.frame(highest_births)
+highest_births <- highest_births[,-17]
+kable(list(highest_births[,c(7,12)]), col.names = c("Name","Number of live births"), caption = "Regions with the highest number of births", align = "cc")
+```
+
+## Number of births in UK
+
+```{r fig.cap = "Number of live births in UK by region"}
+green_area <- rgb(24, 121, 104, 80, names = NULL, maxColorValue = 255)
+pal <- colorRampPalette(c("white", green_area), bias = 1)
+plot(spatial_data[,"Number of live births"], pal = pal,
+     main = "Number of live births")
+```
+
